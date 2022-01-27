@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: s2i-dotnet
+  name: dotnet
   labels:
     app.kubernetes.io/version: "0.1"
   annotations:
@@ -10,7 +10,7 @@ metadata:
     tekton.dev/displayName: "s2i dotnet"
 spec:
   description: >-
-    s2i-dotnet task fetches a Git repository and builds and
+    dotnet task fetches a Git repository and builds and
     pushes a container image using S2I and a .NET Core builder image.
 
   results:
