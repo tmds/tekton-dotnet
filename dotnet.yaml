@@ -35,17 +35,49 @@ spec:
     - name: IMAGE
       description: Location of the repo where image has to be pushed
       type: string
+    - name: PROJECT
+      description: The location of the buildah builder image.
+      default: quay.io/buildah/stable:v1.17.0
+    - name: VERSION
   workspaces:
     - name: source
       mountPath: /workspace/source
   steps:
+    - name: gen-env-file
+      image: quay.io/openshift-pipeline/s2i
+      workingdir: /env-params
+      command:
+        - '/bin/sh'
+        - '-c'
+      args:
+        - |-
+          [[ '$(params.PROJECT)' != "" ]] &&
+            echo "DOTNET_STARUP_PROJECT=$(params.PROJECT)" >> env-file
+
+          echo "Generated Env file"
+          echo "------------------------------"
+          cat env-file
+          echo "------------------------------"
+      volumeMounts:
+        - name: envparams
+          mountPath: /env-params
     - name: generate
       image: quay.io/openshift-pipeline/s2i
       workingdir: $(workspaces.source.path)
-      command: ['s2i', 'build', '$(params.PATH_CONTEXT)', 'image-registry.openshift-image-registry.svc:5000/openshift/dotnet:$(params.VERSION)', '--as-dockerfile', '/gen-source/Dockerfile.gen']
+      command:
+        - 's2i'
+        - 'build'
+        - '$(params.PATH_CONTEXT)'
+        - 'image-registry.openshift-image-registry.svc:5000/openshift/dotnet:$(params.VERSION)'
+        - '--as-dockerfile'
+        - '/gen-source/Dockerfile.gen'
+        - '--environment-file'
+        - '/env-params/env-file'
       volumeMounts:
         - name: gen-source
           mountPath: /gen-source
+        - name: envparams
+          mountPath: /env-params
       env:
         - name: HOME
           value: /tekton/home
@@ -72,4 +104,6 @@ spec:
     - name: varlibcontainers
       emptyDir: {}
     - name: gen-source
+      emptyDir: {}
+    - name: envparams
       emptyDir: {}
