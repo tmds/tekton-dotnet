@@ -39,6 +39,11 @@ spec:
       description: The location of the buildah builder image.
       default: quay.io/buildah/stable:v1.17.0
     - name: VERSION
+  stepTemplate:
+    envFrom:
+      - prefix: DOTNET_
+        configMapRef:
+          name: dotnet-configmap
   workspaces:
     - name: source
       mountPath: /workspace/source
@@ -107,3 +112,6 @@ spec:
       emptyDir: {}
     - name: envparams
       emptyDir: {}
+    - name: dotnet-configmap
+      configMap:
+        name: dotnet-config
