@@ -36,9 +36,13 @@ spec:
       description: Location of the repo where image has to be pushed
       type: string
     - name: PROJECT
-      description: The location of the buildah builder image.
-      default: quay.io/buildah/stable:v1.17.0
-    - name: VERSION
+      description: The location of the .NET project file or its parent folder.
+      default: "true"
+    - name: CONFIGURATION
+      description: Build configuration.
+      default: "Release"
+    - name: NUGETCONFIG
+      description: NuGet configuration.
   stepTemplate:
     envFrom:
       - prefix: DOTNET_
@@ -57,11 +61,25 @@ spec:
       args:
         - |-
           [[ '$(params.PROJECT)' != "" ]] &&
-            echo "DOTNET_STARUP_PROJECT=$(params.PROJECT)" >> env-file
+            echo "DOTNET_STARTUP_PROJECT=$(params.PROJECT)" >> env-file
+
+          [[ '$(params.CONFIGURATION)' != "" ]] &&
+            echo "DOTNET_CONFIGURATION=$(params.CONFIGURATION)" >> env-file
+
+          [[ '$(params.NUGETCONFIG)' != "" ]] &&
+            echo "DOTNET_RESTORE_CONFIGFILE=/env-params/NuGet.Config" >> env-file &&
+            cat - >NuGet.Config <<'EOF'
+            $(params.NUGETCONFIG)
+          EOF
 
           echo "Generated Env file"
           echo "------------------------------"
           cat env-file
+          echo "------------------------------"
+
+          echo "Generated NuGet.Config file"
+          echo "------------------------------"
+          cat NuGet.Config
           echo "------------------------------"
       volumeMounts:
         - name: envparams
@@ -89,12 +107,14 @@ spec:
     - name: build
       image: $(params.BUILDER_IMAGE)
       workingdir: /gen-source
-      command: ['buildah', 'bud', '--storage-driver=vfs', '--tls-verify=$(params.TLSVERIFY)', '--layers', '-f', '/gen-source/Dockerfile.gen', '-t', '$(params.IMAGE)', '.']
+      command: ['buildah', 'bud', '--storage-driver=vfs', '--tls-verify=$(params.TLSVERIFY)', '--layers', '-f', '/gen-source/Dockerfile.gen', '-t', '$(params.IMAGE)', '-v', '/env-params:/env-params', '.']
       volumeMounts:
         - name: varlibcontainers
           mountPath: /var/lib/containers
         - name: gen-source
           mountPath: /gen-source
+        - name: envparams
+          mountPath: /env-params
     - name: push
       workingDir: $(workspaces.source.path)
       image: $(params.BUILDER_IMAGE)
