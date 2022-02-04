@@ -1,3 +1,8 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: dotnet-configmap
+---
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
@@ -40,12 +45,13 @@ spec:
       default: "true"
     - name: CONFIGURATION
       description: Build configuration.
-      default: "Release"
+      default: ""
     - name: NUGETCONFIG
       description: NuGet configuration.
+      default: ""
   stepTemplate:
     envFrom:
-      - prefix: DOTNET_
+      - prefix: CONFIGMAP_
         configMapRef:
           name: dotnet-configmap
   workspaces:
@@ -60,16 +66,28 @@ spec:
         - '-c'
       args:
         - |-
-          [[ '$(params.PROJECT)' != "" ]] &&
-            echo "DOTNET_STARTUP_PROJECT=$(params.PROJECT)" >> env-file
+          # Task parameters.
+          PROJECT='$(params.PROJECT)'
+          CONFIGURATION='$(params.CONFIGURATION)'
+          NUGETCONFIG=$(cat <<'EOF'
+          $(params.NUGETCONFIG)
+          EOF
+          )
 
-          [[ '$(params.CONFIGURATION)' != "" ]] &&
-            echo "DOTNET_CONFIGURATION=$(params.CONFIGURATION)" >> env-file
+          # configmap parameters.
+          [ -z "$PROJECT" ] && PROJECT="$CONFIGMAP_PROJECT"
+          [ -z "$CONFIGURATION" ] && CONFIGURATION="$CONFIGMAP_CONFIGURATION"
+          [ -z "$NUGETCONFIG" ] && NUGETCONFIG="$CONFIGMAP_NUGETCONFIG"
 
-          [[ '$(params.NUGETCONFIG)' != "" ]] &&
-            echo "DOTNET_RESTORE_CONFIGFILE=/env-params/NuGet.Config" >> env-file &&
-            cat - >NuGet.Config <<'EOF'
-            $(params.NUGETCONFIG)
+          # Write env-file, NuGet.Config.
+          [ -n "$PROJECT" ] &&
+          echo "DOTNET_STARTUP_PROJECT=$PROJECT" >> env-file
+          [ -n "$CONFIGURATION" ] &&
+          echo "DOTNET_CONFIGURATION=$CONFIGURATION" >> env-file
+          [ -n "$NUGETCONFIG" ] &&
+          echo "DOTNET_RESTORE_CONFIGFILE=/env-params/NuGet.Config" >> env-file &&
+          cat - >NuGet.Config <<EOF
+          $NUGETCONFIG
           EOF
 
           echo "Generated Env file"
